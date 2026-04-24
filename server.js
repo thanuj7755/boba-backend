@@ -6,7 +6,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ CONNECT MONGODB (FROM ENV)
+// ✅ CONNECT MONGODB
 const MONGO_URI = process.env.MONGO_URI;
 
 mongoose.connect(MONGO_URI)
@@ -38,6 +38,12 @@ app.post("/login", async (req, res) => {
       await user.save();
     }
 
+    // 🔥 FIX: always sync reward
+    if (user.visits >= 7 && !user.reward) {
+      user.reward = true;
+      await user.save();
+    }
+
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: "Login failed" });
@@ -55,10 +61,13 @@ app.post("/add-visit", async (req, res) => {
       return res.status(400).json({ error: "User not found" });
     }
 
-    if (amount >= 250 && user.visits < 7) {
-      user.visits += 1;
+    if (amount >= 250) {
+      if (user.visits < 7) {
+        user.visits += 1;
+      }
 
-      if (user.visits === 7) {
+      // 🔥 FIX: always check reward
+      if (user.visits >= 7) {
         user.reward = true;
       }
 
@@ -71,7 +80,7 @@ app.post("/add-visit", async (req, res) => {
   }
 });
 
-// ✅ RESET
+// ✅ RESET (AFTER CLAIM)
 app.post("/reset", async (req, res) => {
   try {
     const { phone } = req.body;
