@@ -6,81 +6,108 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ CONNECT MONGODB
-mongoose.connect("mongodb+srv://thanujpedapudi12_db_user:Thanuj123@cluster0.d0qi1ze.mongodb.net/boba?retryWrites=true&w=majority")
-.then(() => console.log("MongoDB Connected"))
-.catch(err => console.log(err));
+// ✅ CONNECT MONGODB (FROM ENV)
+const MONGO_URI = process.env.MONGO_URI;
+
+mongoose.connect(MONGO_URI)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch(err => console.log("❌ Mongo Error:", err));
 
 // ✅ SCHEMA
 const userSchema = new mongoose.Schema({
-  phone: String,
+  phone: { type: String, required: true, unique: true },
   visits: { type: Number, default: 0 },
   reward: { type: Boolean, default: false }
 });
 
 const User = mongoose.model("User", userSchema);
 
-// LOGIN
+// ✅ LOGIN
 app.post("/login", async (req, res) => {
-  const { phone } = req.body;
+  try {
+    const { phone } = req.body;
 
-  let user = await User.findOne({ phone });
+    if (!phone) {
+      return res.status(400).json({ error: "Phone required" });
+    }
 
-  if (!user) {
-    user = new User({ phone });
-    await user.save();
+    let user = await User.findOne({ phone });
+
+    if (!user) {
+      user = new User({ phone });
+      await user.save();
+    }
+
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Login failed" });
   }
-
-  res.json(user);
 });
 
-// ADD VISIT
+// ✅ ADD VISIT
 app.post("/add-visit", async (req, res) => {
-  const { phone, amount } = req.body;
+  try {
+    const { phone, amount } = req.body;
 
-  let user = await User.findOne({ phone });
+    let user = await User.findOne({ phone });
 
-  if (!user) return res.status(400).json({ error: "User not found" });
+    if (!user) {
+      return res.status(400).json({ error: "User not found" });
+    }
 
-  if (amount >= 250) {
-    if (user.visits < 7) user.visits += 1;
-    if (user.visits === 7) user.reward = true;
+    if (amount >= 250 && user.visits < 7) {
+      user.visits += 1;
 
-    await user.save();
+      if (user.visits === 7) {
+        user.reward = true;
+      }
+
+      await user.save();
+    }
+
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Visit update failed" });
   }
-
-  res.json(user);
 });
 
-// RESET
+// ✅ RESET
 app.post("/reset", async (req, res) => {
-  const { phone } = req.body;
+  try {
+    const { phone } = req.body;
 
-  let user = await User.findOne({ phone });
+    let user = await User.findOne({ phone });
 
-  if (user) {
-    user.visits = 0;
-    user.reward = false;
-    await user.save();
+    if (user) {
+      user.visits = 0;
+      user.reward = false;
+      await user.save();
+    }
+
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Reset failed" });
   }
-
-  res.json(user);
 });
 
-// GET USER
+// ✅ GET USER
 app.get("/user/:phone", async (req, res) => {
-  const user = await User.findOne({ phone: req.params.phone });
-  res.json(user || {});
+  try {
+    const user = await User.findOne({ phone: req.params.phone });
+    res.json(user || {});
+  } catch (err) {
+    res.status(500).json({ error: "Fetch failed" });
+  }
 });
 
-// ROOT
+// ✅ ROOT
 app.get("/", (req, res) => {
   res.send("Boba Backend is running 🚀");
 });
 
-// PORT
+// ✅ PORT
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
