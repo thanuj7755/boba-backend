@@ -42,21 +42,31 @@ app.post("/add-visit", (req, res) => {
   res.json(users[phone]);
 });
 
-// RESET AFTER REWARD (optional future use)
+// RESET AFTER REWARD
 app.post("/reset", (req, res) => {
   const { phone } = req.body;
 
-  users[phone].visits = 0;
-  users[phone].reward = false;
+  if (users[phone]) {
+    users[phone].visits = 0;
+    users[phone].reward = false;
+  }
 
   res.json(users[phone]);
 });
 
 // GET USER
 app.get("/user/:phone", (req, res) => {
-  res.json(users[req.params.phone]);
+  res.json(users[req.params.phone] || {});
 });
 
-app.listen(5000, () => {
-  console.log("Server running on port 5000");
+// ROOT ROUTE (important for Render)
+app.get("/", (req, res) => {
+  res.send("Boba Backend is running 🚀");
+});
+
+// ✅ IMPORTANT: PORT FIX
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
