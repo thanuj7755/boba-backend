@@ -1,3 +1,4 @@
+// server.js (FINAL BACKEND)
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -6,152 +7,91 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ===============================
-// ✅ CONNECT MONGODB
-// ===============================
-const MONGO_URI = process.env.MONGO_URI;
+mongoose.connect(process.env.MONGO_URI)
+.then(()=>console.log("MongoDB Connected"))
+.catch(err=>console.log(err));
 
-mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch(err => console.log("❌ Mongo Error:", err));
-
-// ===============================
-// ✅ SCHEMA
-// ===============================
 const userSchema = new mongoose.Schema({
-  phone: { type: String, required: true, unique: true },
-  visits: { type: Number, default: 0 },
-  reward: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now },
-  lastPurchase: { type: Date, default: null }
-});
+phone:{type:String,unique:true},
+visits:{type:Number,default:0},
+reward:{type:Boolean,default:false}
+},{timestamps:true});
 
 const User = mongoose.model("User", userSchema);
 
-// ===============================
-// ✅ LOGIN
-// ===============================
-app.post("/login", async (req, res) => {
-  try {
-    const { phone } = req.body;
+// LOGIN
+app.post("/login", async(req,res)=>{
+try{
+const {phone}=req.body;
+let user=await User.findOne({phone});
 
-    if (!phone) {
-      return res.status(400).json({ error: "Phone required" });
-    }
+if(!user){
+user=await User.create({phone});
+}
 
-    let user = await User.findOne({ phone });
+if(user.visits>=7){
+user.reward=true;
+await user.save();
+}
 
-    if (!user) {
-      user = new User({ phone });
-      await user.save();
-    }
-
-    // Auto sync reward
-    if (user.visits >= 7 && !user.reward) {
-      user.reward = true;
-      await user.save();
-    }
-
-    res.json(user);
-
-  } catch (err) {
-    res.status(500).json({ error: "Login failed" });
-  }
+res.json(user);
+}catch{
+res.status(500).json({error:"login failed"});
+}
 });
 
-// ===============================
-// ✅ ADD VISIT
-// ===============================
-app.post("/add-visit", async (req, res) => {
-  try {
-    const { phone, amount } = req.body;
+// ADD VISIT
+app.post("/add-visit", async(req,res)=>{
+try{
+const {phone,amount}=req.body;
+let user=await User.findOne({phone});
 
-    let user = await User.findOne({ phone });
+if(!user) return res.status(404).json({error:"not found"});
 
-    if (!user) {
-      return res.status(400).json({ error: "User not found" });
-    }
+if(amount>=250){
+if(user.visits<7) user.visits+=1;
+if(user.visits>=7) user.reward=true;
+await user.save();
+}
 
-    if (amount >= 250) {
-
-      if (user.visits < 7) {
-        user.visits += 1;
-      }
-
-      if (user.visits >= 7) {
-        user.reward = true;
-      }
-
-      user.lastPurchase = new Date();
-
-      await user.save();
-    }
-
-    res.json(user);
-
-  } catch (err) {
-    res.status(500).json({ error: "Visit update failed" });
-  }
+res.json(user);
+}catch{
+res.status(500).json({error:"failed"});
+}
 });
 
-// ===============================
-// ✅ RESET REWARD
-// ===============================
-app.post("/reset", async (req, res) => {
-  try {
-    const { phone } = req.body;
-
-    let user = await User.findOne({ phone });
-
-    if (user) {
-      user.visits = 0;
-      user.reward = false;
-      await user.save();
-    }
-
-    res.json(user);
-
-  } catch (err) {
-    res.status(500).json({ error: "Reset failed" });
-  }
+// RESET
+app.post("/reset", async(req,res)=>{
+try{
+const {phone}=req.body;
+let user=await User.findOne({phone});
+if(user){
+user.visits=0;
+user.reward=false;
+await user.save();
+}
+res.json(user);
+}catch{
+res.status(500).json({error:"failed"});
+}
 });
 
-// ===============================
-// ✅ GET SINGLE USER
-// ===============================
-app.get("/user/:phone", async (req, res) => {
-  try {
-    const user = await User.findOne({ phone: req.params.phone });
-    res.json(user || {});
-  } catch (err) {
-    res.status(500).json({ error: "Fetch failed" });
-  }
+// GET SINGLE USER
+app.get("/user/:phone", async(req,res)=>{
+const user=await User.findOne({phone:req.params.phone});
+res.json(user||{});
 });
 
-// ===============================
-// ✅ ADMIN - ALL USERS
-// ===============================
-app.get("/all-users", async (req, res) => {
-  try {
-    const users = await User.find().sort({ createdAt: -1 });
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch users" });
-  }
+// GET ALL USERS (ADMIN)
+app.get("/users", async(req,res)=>{
+const users=await User.find().sort({updatedAt:-1});
+res.json(users);
 });
 
-// ===============================
-// ✅ ROOT
-// ===============================
-app.get("/", (req, res) => {
-  res.send("Boba Backend is running 🚀");
+app.get("/",(req,res)=>{
+res.send("Boba Backend Live");
 });
 
-// ===============================
-// ✅ PORT
-// ===============================
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+app.listen(process.env.PORT || 5000, ()=>{
+console.log("Server running");
 });
