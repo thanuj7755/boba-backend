@@ -6,23 +6,31 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ===============================
 // ✅ CONNECT MONGODB
+// ===============================
 const MONGO_URI = process.env.MONGO_URI;
 
 mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected"))
   .catch(err => console.log("❌ Mongo Error:", err));
 
+// ===============================
 // ✅ SCHEMA
+// ===============================
 const userSchema = new mongoose.Schema({
   phone: { type: String, required: true, unique: true },
   visits: { type: Number, default: 0 },
-  reward: { type: Boolean, default: false }
+  reward: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now },
+  lastPurchase: { type: Date, default: null }
 });
 
 const User = mongoose.model("User", userSchema);
 
+// ===============================
 // ✅ LOGIN
+// ===============================
 app.post("/login", async (req, res) => {
   try {
     const { phone } = req.body;
@@ -38,19 +46,22 @@ app.post("/login", async (req, res) => {
       await user.save();
     }
 
-    // 🔥 FIX: always sync reward
+    // Auto sync reward
     if (user.visits >= 7 && !user.reward) {
       user.reward = true;
       await user.save();
     }
 
     res.json(user);
+
   } catch (err) {
     res.status(500).json({ error: "Login failed" });
   }
 });
 
+// ===============================
 // ✅ ADD VISIT
+// ===============================
 app.post("/add-visit", async (req, res) => {
   try {
     const { phone, amount } = req.body;
@@ -62,25 +73,30 @@ app.post("/add-visit", async (req, res) => {
     }
 
     if (amount >= 250) {
+
       if (user.visits < 7) {
         user.visits += 1;
       }
 
-      // 🔥 FIX: always check reward
       if (user.visits >= 7) {
         user.reward = true;
       }
+
+      user.lastPurchase = new Date();
 
       await user.save();
     }
 
     res.json(user);
+
   } catch (err) {
     res.status(500).json({ error: "Visit update failed" });
   }
 });
 
-// ✅ RESET (AFTER CLAIM)
+// ===============================
+// ✅ RESET REWARD
+// ===============================
 app.post("/reset", async (req, res) => {
   try {
     const { phone } = req.body;
@@ -94,12 +110,15 @@ app.post("/reset", async (req, res) => {
     }
 
     res.json(user);
+
   } catch (err) {
     res.status(500).json({ error: "Reset failed" });
   }
 });
 
-// ✅ GET USER
+// ===============================
+// ✅ GET SINGLE USER
+// ===============================
 app.get("/user/:phone", async (req, res) => {
   try {
     const user = await User.findOne({ phone: req.params.phone });
@@ -109,12 +128,28 @@ app.get("/user/:phone", async (req, res) => {
   }
 });
 
+// ===============================
+// ✅ ADMIN - ALL USERS
+// ===============================
+app.get("/all-users", async (req, res) => {
+  try {
+    const users = await User.find().sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+// ===============================
 // ✅ ROOT
+// ===============================
 app.get("/", (req, res) => {
   res.send("Boba Backend is running 🚀");
 });
 
+// ===============================
 // ✅ PORT
+// ===============================
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
